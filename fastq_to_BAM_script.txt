@@ -1,0 +1,106 @@
+
+
+
+
+#Writing a bwa mem file
+
+#general syntax: bwa mem index_prefix [input_reads.fastq|input_reads_pair_1.fastq input_reads_pair_2.fastq] [options]
+
+
+#indexing the assembly
+bwa index e_coli_genomeK12
+
+#running the bwa alignment program. NOTE: I added flat "-t 8" so that I could use 8 threads and the command would go more quickly
+
+bwa mem -t 8 e_coli_genomeK12 /home/rossasaurus123/trimmomaticFiles/9_S6_R1_001_trimmed.fastq > 9_S6_R1_001_aln-se.sam
+
+#######################################################################################
+
+
+
+
+#converting a .sam file into a .bam file
+
+samtools view -@ 5 -S -b 7_S4_R1_001_aln-se.sam > 7_S4_R1_001_aln-se.bam
+
+###############################################################################
+
+#converting from .bam to sorted.bam
+
+
+samtools sort 7_S4_R1_001_aln-se.bam -o 7_S4_R1_001_aln-se.sorted.bam
+
+#############################################################################
+
+
+
+#viewing the ref. and all its reads
+
+
+samtools tview 7_S4_R1_001_aln-se.sorted.bam e_coli_genomeK12
+
+##########################################################################
+
+#trimmomatic script
+### this script trims the fastq file
+
+java -jar trimmomatic-0.36.jar SE -phred33 9_S6_R1_001.fastq 9_S6_R1_001_trimmed.fastq ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:40
+
+
+#trimmomatic-0.36.jar is the program file
+# 9_S6_R1_001.fastq is the input file
+# 9_S6_R1_001_trimmed.fastq is the output file
+#TruSeq3-SE.fa is the single end adaptor file
+# Note: last parameters are upper case
+#MINLEN: minimum read length
+#phred: quality scores
+
+#############################################################################
+
+#This script begins with the fastq file, trims it in trimmomatic, then converts it into a sorted.bam file and indexes it.
+
+#type of language that's inside the script:
+#!/bin/sh
+
+DNA_file=$1
+
+ref = e_coli_genomeK12
+
+
+###uncomment if using for the first time:
+#bwa index $ref
+#mkdir BamFiles/
+
+cat $1 | while read line ; do
+
+        echo "$line"
+
+        name='ls $line | cut -d"." -f1'
+
+        echo "reusable name is $name"
+
+        #trimmomatic
+        java -jar trimmomatic-0.36.jar SE -phred33 $line ${name}.trimmed.fastq ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:40
+
+        #bwa mem
+        bwa mem -t 8 $ref ${name}.fastq > ${name}.aln-se.sam
+
+        #.sam to .bam
+        samtools view -@ 5 -S -b ${name}.aln-se.sam > ${name}.aln-se.bam
+
+        #.bam to sorted.bam
+        samtools sort ${name}.aln-se.bam -o ${name}.aln-se.sorted.bam
+
+        #indexing sorted.bam file
+        samtools index ${name}.aln-se.sorted.bam
+
+        rm ${name}.aln-se.sam #big file we probably don't need
+
+        rm ${name}.trimmed.fq
+
+done
+
+#how to make it put .bam files into directories?
+mv *se.sorted.bam* ./BamFiles
+mv *.aln-se.bam ./BamFiles
+
