@@ -1,0 +1,40 @@
+
+filename="/data0/CannabisGenomics2021/assemblies/cs10/GCF_900626175.2_cs10_genomic.fna"
+
+echo "STEP 1: Isolate scaffold(s) and unwrap rows..."
+# Use grep to find line numbers in the big .fna file so we can isolate the scaffold we want.
+# --try: grep -n 'NC_' filename     where the NC_ denotes something unique in the scaffold header.
+# Get the line numbers for that scaffold and the following one. Add 1 to the first number, subtract 1 from the second
+# so we have just the DNA from that scaffold remaining.
+# --try: cat /data0/CannabisGenomics2021/assemblies/cs10/GCF_900626175.2_cs10_genomic.fna | sed -n '9363498,10675841p' > test
+# This sed command returns only those row numbers. The tr -d command here removes all line breaks (\n) to unwrap the DNA.
+
+cat $filename | sed -n '9363499,10675840p' | tr -d '\n' > scaffold1.txt # 1st scaffold
+#cat $filename | sed -n '0000000,0000001p' | tr -d '\n' > scaffold2.txt # 2nd scaffold (if necessary)
+#cat $filename | sed -n '0000000,0000001p' | tr -d '\n' > scaffold3.txt # 3rd scaffold (if necessary)
+
+echo "STEP 2: Set start and stop positions..."
+# Create variables for start and stop positions from the BLAST table
+# The smaller number MUST be the start position.
+declare -i s01=62384035
+declare -i e01=62384267
+declare -i s02=62388408
+declare -i e02=62388633
+declare -i s03=62395463
+declare -i e03=62395689
+declare -i padding=6
+
+echo "STEP 3: Pull out desired range of characters (nucleotides)..."
+# Also, add 6 extra chars to the beginning and end to give us some padding, and add simple header to separate the genes, i.e.">1"
+cut -c $(( s01-padding ))-$(( e01+padding )) scaffold1.txt | sed '1s/^/>gene 1\n/' > gene1
+cut -c $(( s02-padding ))-$(( e02+padding )) scaffold1.txt | sed '1s/^/>gene 2\n/' > gene2
+cut -c $(( s03-padding ))-$(( e03+padding )) scaffold1.txt | sed '1s/^/>gene 3\n/' > gene3
+
+echo "STEP 4: Combine genes into 1 file..."
+cat gene1 gene2 gene3 > final_genes.txt
+
+echo "STEP 5: Delete intermediate files no longer needed..."
+# Comment out the following line to examine the genes individually.
+rm gene1 | rm gene2 | rm gene3
+
+echo "Done!"
